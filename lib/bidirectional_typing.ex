@@ -58,6 +58,21 @@ defmodule BidirectionalTyping do
     end
   end
 
+  @strict System.get_env("STRICT") == "1"
+
+  if not @strict do
+    # let's instead take the type of the first branch, and require the second to match
+    def synth(ctx, {:if, e1, e2, e3}) do
+      with {:ok, :bool} <- synth(ctx, e1),
+           {:ok, t} <- synth(ctx, e2),
+           {:ok, ^t} <- check(ctx, e3, t) do
+        {:ok, t}
+      else
+        _ -> :error
+      end
+    end
+  end
+
   def synth(_, _), do: :error
 
   # $ ctx -> e -> t -> result(t)
@@ -92,4 +107,9 @@ defmodule BidirectionalTyping do
 
   # $ ctx -> name -> t -> ctx
   def extend(ctx, x, t), do: Map.put(ctx, x, t)
+
+  # ---
+
+  def strict?, do: @strict
+  def __mix_recompile__?, do: System.get_env("STRICT") == "1" != @strict
 end

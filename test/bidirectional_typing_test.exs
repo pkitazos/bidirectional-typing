@@ -31,8 +31,12 @@ defmodule BidirectionalTypingTest do
   end
 
   test "conditional", ctx do
-    assert BT.synth(ctx, {:if, @x, false, true}) == :error
-    assert BT.synth(ctx, {:annot, {:if, @x, false, true}, @bool}) == {:ok, @bool}
+    if BT.strict?() do
+      assert BT.synth(ctx, {:if, @x, false, true}) == :error
+      assert BT.synth(ctx, {:annot, {:if, @x, false, true}, @bool}) == {:ok, @bool}
+    else
+      assert BT.check(ctx, {:if, @x, false, true}, @bool) == {:ok, @bool}
+    end
   end
 
   test "abstraction" do
@@ -44,4 +48,23 @@ defmodule BidirectionalTypingTest do
   test "application", ctx do
     assert BT.synth(ctx, {:app, @f, @x}) == {:ok, @bool}
   end
+
+  @b {:var, :b}
+  @g {:var, :g}
+
+  test "bigger example from tutorial" do
+    # λf. λg. λb. g (f b) : (bool -> bool) -> (bool -> bool) -> bool -> bool
+
+    program = lam(:f, lam(:g, lam(:b, app(@g, app(@f, @b)))))
+    type = arrows([@arrow, @arrow, @bool, @bool])
+
+    assert BT.synth(%{}, {:annot, program, type}) == {:ok, type}
+  end
+
+  defp lam(x, e), do: {:abs, x, e}
+  defp app(e1, e2), do: {:app, e1, e2}
+
+  # arrows are right-associative: arrows([a, b, c]) == a -> (b -> c)
+  defp arrows([t]), do: t
+  defp arrows([t | ts]), do: {:->, t, arrows(ts)}
 end
